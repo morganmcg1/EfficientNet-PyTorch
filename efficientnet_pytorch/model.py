@@ -3,7 +3,7 @@ from torch import nn
 from torch.nn import functional as F
 
 from .utils import (
-    relu_fn,
+    get_activation_fn,
     round_filters,
     round_repeats,
     drop_connect,
@@ -32,6 +32,7 @@ class MBConvBlock(nn.Module):
         self._bn_eps = global_params.batch_norm_epsilon
         self.has_se = (self._block_args.se_ratio is not None) and (0 < self._block_args.se_ratio <= 1)
         self.id_skip = block_args.id_skip  # skip connection and drop connect
+        self.act_fn = global_params.activation_fn
 
         # Get static or dynamic convolution depending on image size
         Conv2d = get_same_padding_conv2d(image_size=global_params.image_size)
@@ -72,13 +73,17 @@ class MBConvBlock(nn.Module):
         # Expansion and Depthwise Convolution
         x = inputs
         if self._block_args.expand_ratio != 1:
-            x = relu_fn(self._bn0(self._expand_conv(inputs)))
-        x = relu_fn(self._bn1(self._depthwise_conv(x)))
+            # x = relu_fn(self._bn0(self._expand_conv(inputs)))
+            x = self.act_fn(self._bn0(self._expand_conv(inputs)))
+        # x = relu_fn(self._bn1(self._depthwise_conv(x)))
+        x = self.act_fn(self._bn1(self._depthwise_conv(x)))
+        
 
         # Squeeze and Excitation
         if self.has_se:
             x_squeezed = F.adaptive_avg_pool2d(x, 1)
-            x_squeezed = self._se_expand(relu_fn(self._se_reduce(x_squeezed)))
+            # x_squeezed = self._se_expand(relu_fn(self._se_reduce(x_squeezed)))
+            x_squeezed = self._se_expand(self.act_fn(self._se_reduce(x_squeezed)))
             x = torch.sigmoid(x_squeezed) * x
 
         x = self._bn2(self._project_conv(x))
@@ -110,8 +115,9 @@ class EfficientNet(nn.Module):
         assert isinstance(blocks_args, list), 'blocks_args should be a list'
         assert len(blocks_args) > 0, 'block args must be greater than 0'
         self._global_params = global_params
+        self.act_fn = global_params.activation_fn
         self._blocks_args = blocks_args
-
+        
         # Get static or dynamic convolution depending on image size
         Conv2d = get_same_padding_conv2d(image_size=global_params.image_size)
 
@@ -157,7 +163,8 @@ class EfficientNet(nn.Module):
         """ Returns output of the final convolution layer """
 
         # Stem
-        x = relu_fn(self._bn0(self._conv_stem(inputs)))
+        # x = relu_fn(self._bn0(self._conv_stem(inputs)))
+        x = self.act_fn(self._bn0(self._conv_stem(inputs)))
 
         # Blocks
         for idx, block in enumerate(self._blocks):
@@ -167,8 +174,8 @@ class EfficientNet(nn.Module):
             x = block(x, drop_connect_rate=drop_connect_rate)
 
         # Head
-        x = relu_fn(self._bn1(self._conv_head(x)))
-
+        # x = relu_fn(self._bn1(self._conv_head(x)))
+        x = self.act_fn(self._bn1(self._conv_head(x)))
         return x
 
     def forward(self, inputs):
@@ -191,8 +198,11 @@ class EfficientNet(nn.Module):
         return cls(blocks_args, global_params)
 
     @classmethod
-    def from_pretrained(cls, model_name, num_classes=1000):
-        model = cls.from_name(model_name, override_params={'num_classes': num_classes})
+    def from_pretrained(cls, model_name, num_classes=1000, activation_fn='swish'):
+        activation_fn=get_activation_fn(activation_fn)   
+        #if activation_fn == 'mish': activation_fn=get_activation_fn()
+        #    else: activation_fn=activation_fn
+        model = cls.from_name(model_name, override_params={'num_classes': num_classes, 'activation_fn':activation_fn})
         load_pretrained_weights(model, model_name, load_fc=(num_classes == 1000))
         return model
 

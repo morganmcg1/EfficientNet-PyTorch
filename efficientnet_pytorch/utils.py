@@ -22,7 +22,7 @@ from torch.utils import model_zoo
 GlobalParams = collections.namedtuple('GlobalParams', [
     'batch_norm_momentum', 'batch_norm_epsilon', 'dropout_rate',
     'num_classes', 'width_coefficient', 'depth_coefficient',
-    'depth_divisor', 'min_depth', 'drop_connect_rate', 'image_size'])
+    'depth_divisor', 'min_depth', 'drop_connect_rate', 'image_size', 'activation_fn'])
 
 
 # Parameters for an individual model block
@@ -37,10 +37,32 @@ BlockArgs.__new__.__defaults__ = (None,) * len(BlockArgs._fields)
 
 
 def relu_fn(x):
+    """ ReLU activation function """
+    r = nn.ReLU()
+    return r(x)
+
+def swish_fn(x):
     """ Swish activation function """
     return x * torch.sigmoid(x)
 
+def mish_fn(x):
+    """
+        Code: https://github.com/digantamisra98/Mish
+        Paper: https://arxiv.org/abs/1908.08681
+        Blog post :  https://medium.com/@lessw/meet-mish-new-state-of-the-art-ai-activation-function-the-successor-to-relu-846a6d93471f
+    """
+    return x *(torch.tanh(F.softplus(x)))
 
+activation_fn=swish_fn
+
+def get_activation_fn(fn_name):
+    if fn_name=='mish':
+        fn = mish_fn
+    if fn_name=='relu':
+        fn = relu_fn
+    else: fn = swish_fn
+    return fn
+   
 def round_filters(filters, global_params):
     """ Calculate and round number of filters based on depth multiplier. """
     multiplier = global_params.width_coefficient
@@ -233,6 +255,7 @@ class BlockDecoder(object):
 
 def efficientnet(width_coefficient=None, depth_coefficient=None, dropout_rate=0.2,
                  drop_connect_rate=0.2, image_size=None, num_classes=1000):
+                 # drop_connect_rate=0.2, image_size=None, num_classes=1000, activation_fn=swish_fn):
     """ Creates a efficientnet model. """
 
     blocks_args = [
