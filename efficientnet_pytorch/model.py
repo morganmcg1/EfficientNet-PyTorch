@@ -199,9 +199,11 @@ class EfficientNet(nn.Module):
 
     @classmethod
     def from_pretrained(cls, model_name, num_classes=1000, activation_fn='swish'):
+        '''
+            num_classes   : int , change the number of output classes required
+            activation_fn : str , select 'swish', 'mish' or 'relu', default is 'swish'          
+        '''
         activation_fn=get_activation_fn(activation_fn)   
-        #if activation_fn == 'mish': activation_fn=get_activation_fn()
-        #    else: activation_fn=activation_fn
         model = cls.from_name(model_name, override_params={'num_classes': num_classes, 'activation_fn':activation_fn})
         load_pretrained_weights(model, model_name, load_fc=(num_classes == 1000))
         return model
