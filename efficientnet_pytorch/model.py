@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
+# get_activation_fn enables mish, relu, swish
 from .utils import (
     get_activation_fn,
     round_filters,

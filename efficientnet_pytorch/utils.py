@@ -18,7 +18,7 @@ from torch.utils import model_zoo
 ########################################################################
 
 
-# Parameters for the entire model (stem, all blocks, and head)
+# Parameters for the entire model (stem, all blocks, head and activation function)
 GlobalParams = collections.namedtuple('GlobalParams', [
     'batch_norm_momentum', 'batch_norm_epsilon', 'dropout_rate',
     'num_classes', 'width_coefficient', 'depth_coefficient',
@@ -56,6 +56,7 @@ def mish_fn(x):
 activation_fn=swish_fn
 
 def get_activation_fn(fn_name):
+    """ Retrieves activation function and enables future activations to be added """
     if fn_name=='mish':
         fn = mish_fn
     if fn_name=='relu':
